@@ -124,27 +124,29 @@ mod lin_alg{
 pub mod activation_fns{
 
     pub trait Activate{
-        fn activate(x: f32) -> f32;
+        fn activate(&self, x: f32) -> f32;
     }
 
     pub struct Relu {}
     impl Activate for Relu {
-        fn activate(x: f32) -> f32 {
+        /// max(0, x)
+        fn activate(&self, x: f32) -> f32 {
             f32::max(0f32,x)
         }
     }
 
     pub struct Sigmoid{}
     impl Activate for Sigmoid{
-        fn activate(x: f32) -> f32 {
-            // 1 / (1 + e^-x)
+        /// 1 / (1 + e^-x)
+        fn activate(&self, x: f32) -> f32 {
             1f32 / (1f32 + ((-1f32 * x).exp()))
         }
     }
 
     pub struct Tanh{}
     impl Activate for Tanh{
-        fn activate(x: f32) -> f32 {
+        /// tanh(x)
+        fn activate(&self, x: f32) -> f32 {
             f32::tanh(x)
         }
     }
@@ -156,27 +158,60 @@ mod optimizers{
 }
 
 mod layers{
+    use crate::activation_fns::{Activate};
+    use std::ops::Deref;
+    use std::borrow::Borrow;
+
     pub trait Layer{
         fn get_weights(&self) -> &Vec<f32>;
 
-        fn forward_propagate(&self, prev_layer: Vec<f32>);
+        fn forward_propagate(&self, prev_layer: &Vec<f32>) -> Vec<f32>;
 
-        fn back_propagate(&self, next_layer: Vec<f32>);
+        fn back_propagate(&self, next_layer: &Vec<f32>);
     }
 
-    struct FCLayer{
-        weights: Vec<f32>
+    pub struct ActivationLayer<'a, T> where T: Activate {
+        pub(crate) func: &'a T
+    }
+
+    impl<'a, T> Layer for ActivationLayer<'a, T> where T: Activate{
+        fn get_weights(&self) -> &Vec<f32> {
+            panic!("Activation Layer has no weights!");
+        }
+
+        /// Apply activation function to all inputs
+        fn forward_propagate(&self, prev_layer: &Vec<f32>) -> Vec<f32>{
+            prev_layer.iter().map(|i| self.func.activate(*i)).collect()
+        }
+
+        /// Do nothing
+        fn back_propagate(&self, next_layer: &Vec<f32>) {
+
+        }
+    }
+
+    pub struct FCLayer{
+        weights: Vec<f32>,
+        biases: Vec<f32>,
+
     }
     impl Layer for FCLayer{
         fn get_weights(&self) -> &Vec<f32> {
             &self.weights
         }
 
-        fn forward_propagate(&self, prev_layer: Vec<f32>) {
-            todo!()
+        fn forward_propagate(&self, prev_layer: &Vec<f32>) -> Vec<f32>{
+
+            // calculate dot products
+            // calculate sum of weight * each previous connection
+            // add bias
+            self.weights.iter()
+                .zip(self.biases.iter())
+                .map(|(w, b)| b + prev_layer.iter().fold(0f32, |p, c| p + (c * w)))
+                .collect()
         }
 
-        fn back_propagate(&self, next_layer: Vec<f32>) {
+        fn back_propagate(&self, next_layer: &Vec<f32>) {
             todo!()
         }
     }
@@ -188,24 +223,28 @@ mod tests{
     use crate::activation_fns::{Relu, Sigmoid, Activate};
     use crate::metrics::{Accuracy, Precision, Recall, Metric};
     use crate::loss_fns::{MSE, MAE, Loss};
+    use crate::layers::{ActivationLayer, Layer};
 
     #[test]
     /// Rest Sigmoid activation function
     fn sigmoid(){
-        assert_eq!(0.006692851, Sigmoid::activate(-5f32));
-        assert_eq!(0.047425874, Sigmoid::activate(-3f32));
-        assert_eq!(0.5, Sigmoid::activate(0f32));
-        assert_eq!(0.95257413, Sigmoid::activate(3f32));
-        assert_eq!(0.9933072, Sigmoid::activate(5f32));
+        let s = Sigmoid{};
+
+        assert_eq!(0.006692851, s.activate(-5f32));
+        assert_eq!(0.047425874, s.activate(-3f32));
+        assert_eq!(0.5, s.activate(0f32));
+        assert_eq!(0.95257413, s.activate(3f32));
+        assert_eq!(0.9933072, s.activate(5f32));
 
     }
 
     #[test]
     /// Test ReLU activation function
     fn relu(){
-        assert_eq!(0f32, Relu::activate(-1f32));
-        assert_eq!(1f32, Relu::activate(1f32));
-        assert_eq!(0f32, Relu::activate(0f32));
+        let r = Relu{};
+        assert_eq!(0f32, r.activate(-1f32));
+        assert_eq!(1f32, r.activate(1f32));
+        assert_eq!(0f32, r.activate(0f32));
     }
 
     #[test]
@@ -250,5 +289,18 @@ mod tests{
         assert_eq!(2f32, MAE::calculate_loss(&pred, &resp));
     }
 
+    #[test]
+    /// Test Activation Layer
+    fn activation_layer(){
+        // use Relu for simple activation function
+        let a = Relu{};
+        let l = ActivationLayer{
+            func: &a
+        };
+
+        let forward: Vec<f32> = vec![1.0, 0.0, -2.0];
+        let res = l.forward_propagate(&forward);
+        assert_eq!(vec![1.0, 0.0, 0.0], res);
+    }
 
 }
