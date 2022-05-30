@@ -9,16 +9,16 @@ TODO:
 - Use slices instead of Vec in forward, back, activation, and loss fns
 - Implement Cross Entropy
 - Create Dropout layer
-- Implement regularization
+- Implement regularization (L1, L2)
 - use Vec<Vec<f32>> in loss fn instead of Vec<f32> to be able to easily implement cross entropy or other loss fn
 
  */
 
 mod metrics;
 mod activations;
+mod loss;
 
 pub mod neural_net{
-    // use crate::metrics::{Precision, Metric, Recall, Accuracy};
     use crate::activations::activation_fns::Activate;
     use crate::metrics::metrics::Metric;
 
@@ -57,73 +57,49 @@ pub mod neural_net{
 
 }
 
-pub mod loss_fns{
-
-    pub trait Loss{
-        fn calculate_loss(&self, predictions: &[f32], targets: &[f32]) -> f32;
-    }
-
-    /// Mean Squared Error
-    pub struct MSE{}
-    impl Loss for MSE{
-        /// Mean squared error
-        fn calculate_loss(&self, predictions: &[f32], targets: &[f32]) -> f32 {
-            predictions.iter()
-                .zip(targets.iter())
-                .map(|(p,r)| (p-r).powi(2))
-                .sum::<f32>() / predictions.len() as f32
-        }
-    }
-
-    /// Mean Absolute Error
-    pub struct MAE{}
-    impl Loss for MAE{
-        /// Mean absolute error
-        fn calculate_loss(&self, predictions: &[f32], targets: &[f32]) -> f32 {
-            predictions.iter()
-                .zip(targets.iter())
-                .map(|(p,r)| (p - r).abs())
-                .sum::<f32>() / predictions.len() as f32
-        }
-    }
-
-}
-
 
 mod layers{
     use crate::activations::activation_fns::Activate;
 
     pub trait Layer{
-        fn forward_propagate(&self, prev_layer: &[f32]) -> Vec<f32>;
+        fn forward_propagate(&mut self, prev_layer: &[f32]) -> Vec<f32>;
 
-        fn back_propagate(&self, next_layer: &Vec<f32>);
+        fn back_propagate(&mut self, output_error: &Vec<Vec<f32>>, learning_rate: f32) -> Vec<Vec<f32>>;
     }
 
     pub struct ActivationLayer<'a, T> where T: Activate {
-        pub func: &'a T
+        pub func: &'a T,
+        pub input_data: Vec<f32>
     }
 
     impl<'a, T> Layer for ActivationLayer<'a, T> where T: Activate{
 
         /// Apply activation function to all inputs
-        fn forward_propagate(&self, prev_layer: &[f32]) -> Vec<f32>{
+        fn forward_propagate(&mut self, prev_layer: &[f32]) -> Vec<f32>{
+            self.input_data = prev_layer.to_vec();
             prev_layer.iter().map(|i| self.func.activate(*i)).collect()
         }
 
-        /// Do nothing
-        fn back_propagate(&self, next_layer: &Vec<f32>) {
-
+        /// Apply activation function derivative to input * output error
+        fn back_propagate(&mut self, output_error: &Vec<Vec<f32>>, learning_rate: f32) -> Vec<Vec<f32>>{
+            self.input_data.iter()
+                .map(|i| self.func.derivative(*i))
+                .zip(output_error.iter())
+                .map(|(v,e)| v * e)
+                .collect()
         }
     }
 
     pub struct FCLayer{
         pub weights: Vec<Vec<f32>>, // Vec[neuron][inputs]
         pub biases: Vec<f32>,
+        pub input_data: Vec<f32>
     }
     impl Layer for FCLayer{
 
         /// Forward propagate values
-        fn forward_propagate(&self, prev_layer: &[f32]) -> Vec<f32>{
+        fn forward_propagate(&mut self, prev_layer: &[f32]) -> Vec<f32>{
+            self.input_data = prev_layer.to_vec();
             // calculate dot products
             // For each neuron, multiply the values of the input neurons times the weights for this neuron
             // calculate sum of weight * each previous connection
@@ -138,8 +114,33 @@ mod layers{
                 .collect()
         }
 
-        fn back_propagate(&self, next_layer: &Vec<f32>) {
-            todo!()
+        /// calculate
+        fn back_propagate(&mut self, output_error: &Vec<Vec<f32>>, learning_rate: f32) -> Vec<Vec<f32>>{
+            // calculate weight error with dot product of input * output error
+            // for each input, multiply by each of the outputs
+            let weight_errors: Vec<Vec<f32>> = self.input_data.iter()
+                .map(|i| output_error.iter()
+                    .map(|e| e * i)
+                    .collect())
+                .collect();
+
+            // adjust weights with -= lr * weight error
+            self.weights = self.weights.iter()
+                .zip(weight_errors.iter())
+                .map(|(n,we)| n.iter()
+                    .zip(we.iter())
+                    .map(|(nw, nwe)| nw - (learning_rate * nwe))
+                    .collect())
+                .collect();
+
+            // adjust biases with -= lr * output error
+            self.biases = self.biases.iter()
+                .zip(output_error.iter())
+                .map(|(b,e)| b - (learning_rate * e))
+                .collect();
+
+            // calculate and return input error = dot product of output error and weights
+            vec![]
         }
     }
 
@@ -147,36 +148,18 @@ mod layers{
 
 #[cfg(test)]
 mod tests{
-    use crate::loss_fns::{MSE, MAE, Loss};
     use crate::layers::{ActivationLayer, Layer, FCLayer};
     use crate::activations::activation_fns::Relu;
 
-
-    #[test]
-    /// Test MSE
-    fn mse(){
-        let a = MSE{};
-        let pred = vec![0.0, 1.0, 2.0, 3.0];
-        let resp = vec![2.0, 3.0, 4.0, 5.0];
-        assert_eq!(4f32, a.calculate_loss(&pred, &resp));
-    }
-
-    #[test]
-    /// Test MAE
-    fn mae(){
-        let a = MAE{};
-        let pred = vec![0.0, 1.0, 2.0, 3.0];
-        let resp = vec![2.0, 3.0, 4.0, 5.0];
-        assert_eq!(2f32, a.calculate_loss(&pred, &resp));
-    }
 
     #[test]
     /// Test Activation Layer forward propagation
     fn activation_layer_forward(){
         // use Relu for simple activation function
         let a = Relu{};
-        let l = ActivationLayer{
-            func: &a
+        let mut l = ActivationLayer{
+            func: &a,
+            input_data: vec![]
         };
 
         let forward: Vec<f32> = vec![1.0, 0.0, -2.0];
@@ -194,9 +177,10 @@ mod tests{
         // biases
         let b : Vec<f32> = vec![0.5, 0.25];
 
-        let fc = FCLayer{
+        let mut fc = FCLayer{
             weights: w,
-            biases: b
+            biases: b,
+            input_data: vec![]
         };
 
         let res = fc.forward_propagate(&i);

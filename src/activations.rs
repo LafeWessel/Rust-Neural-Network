@@ -40,6 +40,7 @@ pub mod activation_fns{
             x.tanh()
         }
 
+        /// 1 - tanh(x)^2
         fn derivative(&self, x: f32) -> f32 {
             1.0 - x.tanh().powi(2)
         }
