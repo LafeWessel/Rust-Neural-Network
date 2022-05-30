@@ -3,6 +3,7 @@ pub mod activation_fns{
 
     pub trait Activate{
         fn activate(&self, x: f32) -> f32;
+        fn derivative(&self, x: f32) -> f32;
     }
 
     pub struct Relu {}
@@ -11,21 +12,36 @@ pub mod activation_fns{
         fn activate(&self, x: f32) -> f32 {
             f32::max(0f32,x)
         }
+
+        /// Derivative of Relu
+        fn derivative(&self, x: f32) -> f32 {
+            if x > 0.0 { 1.0 } else { 0.0 }
+        }
     }
 
     pub struct Sigmoid{}
     impl Activate for Sigmoid{
-        /// 1 / (1 + e^-x), length of x should be 1
+        /// 1 / (1 + e^-x)
         fn activate(&self, x: f32) -> f32 {
             1f32 / (1f32 + ((-1f32 * x).exp()))
+        }
+
+        /// sig *  (1 - sig)
+        fn derivative(&self, x: f32) -> f32 {
+            let s = self.activate(x);
+            s * (1.0 - s)
         }
     }
 
     pub struct Tanh{}
     impl Activate for Tanh{
-        /// tanh(x), length of x should be 1
+        /// tanh(x)
         fn activate(&self, x: f32) -> f32 {
             x.tanh()
+        }
+
+        fn derivative(&self, x: f32) -> f32 {
+            1.0 - x.tanh().powi(2)
         }
     }
 
@@ -36,6 +52,10 @@ pub mod activation_fns{
 
         fn activate(&self, x: f32) -> f32 {
             x.exp() / self.dividend.unwrap()
+        }
+
+        fn derivative(&self, x: f32) -> f32 {
+            todo!()
         }
 
     }

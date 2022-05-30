@@ -68,10 +68,9 @@ pub mod loss_fns{
     impl Loss for MSE{
         /// Mean squared error
         fn calculate_loss(&self, predictions: &[f32], targets: &[f32]) -> f32 {
-            assert_eq!(predictions.len(), targets.len(), "Predictions and Responses are not the same length: {} =/= {}", predictions.len(), targets.len());
             predictions.iter()
                 .zip(targets.iter())
-                .map(|(p,r)| (p-r) * (p-r))
+                .map(|(p,r)| (p-r).powi(2))
                 .sum::<f32>() / predictions.len() as f32
         }
     }
@@ -81,7 +80,6 @@ pub mod loss_fns{
     impl Loss for MAE{
         /// Mean absolute error
         fn calculate_loss(&self, predictions: &[f32], targets: &[f32]) -> f32 {
-            assert_eq!(predictions.len(), targets.len(), "Predictions and Responses are not the same length: {} =/= {}", predictions.len(), targets.len());
             predictions.iter()
                 .zip(targets.iter())
                 .map(|(p,r)| (p - r).abs())
