@@ -2,7 +2,7 @@
 /*
 
 TODO:
-- create linear algebra logic
+- create linear algebra logic..?
 - create different activations functions
 - create different optimizer functions
 - create FC layer
@@ -21,7 +21,8 @@ pub mod neural_net{
     use crate::activation_fns::Activate;
 
     pub struct Network{
-        history: History
+        history: History,
+        metrics: Vec<Box<Metric>>,
     }
 
     impl Network{
@@ -44,6 +45,10 @@ pub mod neural_net{
         fn compile(){
 
         }
+        /// calculate metrics
+        fn calculate_metrics(){
+
+        }
     }
 
     pub struct History{
@@ -56,65 +61,145 @@ pub mod neural_net{
     }
 
     impl History{
-        /// Calculate and return Vec<f32> of all precision values
-        pub fn precision(&self) -> Vec<f32>{
-            let m = Precision{};
-            self.apply_metric(&m)
+
+        // /// Apply a metric to the saved TP, TN, FP, FN values
+        // pub fn apply_metric(&self, m: &mut impl Metric) -> Vec<f32>{
+        //     (0..self.epochs as usize).map(|i: usize|
+        //         m.calculate_and_save_metric(
+        //             self.true_pos[i],
+        //             self.true_neg[i],
+        //             self.false_pos[i],
+        //             self.false_neg[i]))
+        //         .collect()
+        // }
+
+        /// Save an epoch's values
+        pub fn save_epoch(&mut self, true_pos: u64, true_neg: u64, false_pos: u64, false_neg: u64, loss: f32){
+            self.epochs += 1;
+            self.true_pos.push(true_pos);
+            self.true_neg.push(true_neg);
+            self.false_pos.push(false_pos);
+            self.false_neg.push(false_neg);
+            self.loss.push(loss);
         }
 
-        /// Calculate and return Vec<f32> of all accuracy values
-        pub fn accuracy(&self) -> Vec<f32>{
-            let m = Accuracy{};
-            self.apply_metric(&m)
-        }
-
-        /// Calculate and return Vec<f32> of all recall values
-        pub fn recall(&self) -> Vec<f32>{
-            let m = Recall{};
-            self.apply_metric(&m)
-        }
-
-        /// Apply a metric to the saved TP, TN, FP, FN values
-        pub fn apply_metric(&self, m: &impl Metric) -> Vec<f32>{
-            (0..self.epochs as usize).map(|i: usize|
-                m.calculate_metric(
-                    self.true_pos[i],
-                    self.true_neg[i],
-                    self.false_pos[i],
-                    self.false_neg[i]))
-                .collect()
-        }
     }
 
 }
 
 pub mod metrics{
+
+    use std::result::Result;
     
     pub trait Metric{
-        fn calculate_metric(&self, true_pos: u64, true_neg: u64, false_pos:u64, false_neg: u64) -> f32;
+        fn calculate_metric(&self,
+                            true_pos: u64,
+                            true_neg: u64,
+                            false_pos:u64,
+                            false_neg: u64) -> f32;
+        fn calculate_and_save_metric(&mut self,
+                                     true_pos: u64,
+                                     true_neg: u64,
+                                     false_pos:u64,
+                                     false_neg: u64);
+        fn get_value(&self, index: usize) -> f32;
+        fn get_values(&self) -> &Vec<f32>;
+
     }
     
-    pub struct Precision{}
+    pub struct Precision{
+        pub values: Vec<f32>
+    }
     impl Metric for Precision{
         /// Precision = TP / (TP + FP)
-        fn calculate_metric(&self, true_pos: u64, _true_neg: u64, false_pos: u64, _false_neg: u64) -> f32 {
+        /// Calculate and save value to values Vec<f32>
+        fn calculate_metric(&self,
+                            true_pos: u64,
+                            _true_neg: u64,
+                            false_pos: u64,
+                            _false_neg: u64) -> f32 {
             (true_pos as f32 / (true_pos + false_pos) as f32) as f32
         }
-    }
-    
-    pub struct Recall{}
-    impl Metric for Recall{
-        /// Recall = TP / (TP + FN)
-        fn calculate_metric(&self, true_pos: u64, _true_neg: u64, _false_pos: u64, false_neg: u64) -> f32 {
-            (true_pos as f32 / (true_pos + false_neg) as f32) as f32
+
+        fn calculate_and_save_metric(&mut self,
+                                     true_pos: u64,
+                                     _true_neg: u64,
+                                     false_pos:u64,
+                                     _false_neg: u64) {
+            self.values.push(
+                self.calculate_metric(true_pos, _true_neg, false_pos, _false_neg));
+        }
+
+        fn get_value(&self, index: usize) -> f32 {
+            *self.values.get(index).expect("Unable to access index")
+        }
+
+        fn get_values(&self) -> &Vec<f32>{
+            &self.values
         }
     }
     
-    pub struct Accuracy{}
+    pub struct Recall{
+        pub values: Vec<f32>
+    }
+    impl Metric for Recall{
+        /// Recall = TP / (TP + FN)
+        /// Calculate and save value to values Vec<f32>
+        fn calculate_metric(&self,
+                            true_pos: u64,
+                            _true_neg: u64,
+                            _false_pos: u64,
+                            false_neg: u64) -> f32 {
+            (true_pos as f32 / (true_pos + false_neg) as f32) as f32
+        }
+
+        fn calculate_and_save_metric(&mut self,
+                                     true_pos: u64,
+                                     _true_neg: u64,
+                                     false_pos:u64,
+                                     _false_neg: u64) {
+            self.values.push(
+                self.calculate_metric(true_pos, _true_neg, false_pos, _false_neg));
+        }
+
+        fn get_value(&self, index: usize) -> f32 {
+            *self.values.get(index).expect("Unable to access index")
+        }
+
+        fn get_values(&self) -> &Vec<f32>{
+            &self.values
+        }
+    }
+    
+    pub struct Accuracy{
+        pub values: Vec<f32>
+    }
     impl Metric for Accuracy{
         /// Accuracy = (TP + TN) / (TP + TN + FP + FN)
-        fn calculate_metric(&self, true_pos: u64, true_neg: u64, false_pos: u64, false_neg: u64) -> f32 {
+        /// Calculate and save value to values Vec<f32>
+        fn calculate_metric(&self,
+                            true_pos: u64,
+                            true_neg: u64,
+                            false_pos: u64,
+                            false_neg: u64) -> f32 {
             ((true_neg + true_pos) as f32 / (true_neg + true_pos + false_neg + false_pos) as f32) as f32
+        }
+
+        fn calculate_and_save_metric(&mut self,
+                                     true_pos: u64,
+                                     _true_neg: u64,
+                                     false_pos:u64,
+                                     _false_neg: u64) {
+            self.values.push(
+                self.calculate_metric(true_pos, _true_neg, false_pos, _false_neg));
+        }
+
+        fn get_value(&self, index: usize) -> f32 {
+            *self.values.get(index).expect("Unable to access index")
+        }
+
+        fn get_values(&self) -> &Vec<f32>{
+            &self.values
         }
     }
 
@@ -123,15 +208,14 @@ pub mod metrics{
 pub mod loss_fns{
 
     pub trait Loss{
-        fn calculate_loss(predictions: &Vec<f32>, targets: &Vec<f32>) -> f32;
+        fn calculate_loss(&self, predictions: &[f32], targets: &[f32]) -> f32;
     }
 
     /// Mean Squared Error
     pub struct MSE{}
     impl Loss for MSE{
         /// Mean squared error
-        fn calculate_loss(predictions: &Vec<f32>, targets: &Vec<f32>) -> f32 {
-
+        fn calculate_loss(&self, predictions: &[f32], targets: &[f32]) -> f32 {
             assert_eq!(predictions.len(), targets.len(), "Predictions and Responses are not the same length: {} =/= {}", predictions.len(), targets.len());
             predictions.iter()
                 .zip(targets.iter())
@@ -144,7 +228,7 @@ pub mod loss_fns{
     pub struct MAE{}
     impl Loss for MAE{
         /// Mean absolute error
-        fn calculate_loss(predictions: &Vec<f32>, targets: &Vec<f32>) -> f32 {
+        fn calculate_loss(&self, predictions: &[f32], targets: &[f32]) -> f32 {
             assert_eq!(predictions.len(), targets.len(), "Predictions and Responses are not the same length: {} =/= {}", predictions.len(), targets.len());
             predictions.iter()
                 .zip(targets.iter())
@@ -202,7 +286,7 @@ mod layers{
     use std::borrow::Borrow;
 
     pub trait Layer{
-        fn forward_propagate(&self, prev_layer: &Vec<f32>) -> Vec<f32>;
+        fn forward_propagate(&self, prev_layer: &[f32]) -> Vec<f32>;
 
         fn back_propagate(&self, next_layer: &Vec<f32>);
     }
@@ -214,7 +298,7 @@ mod layers{
     impl<'a, T> Layer for ActivationLayer<'a, T> where T: Activate{
 
         /// Apply activation function to all inputs
-        fn forward_propagate(&self, prev_layer: &Vec<f32>) -> Vec<f32>{
+        fn forward_propagate(&self, prev_layer: &[f32]) -> Vec<f32>{
             prev_layer.iter().map(|i| self.func.activate(*i)).collect()
         }
 
@@ -227,12 +311,11 @@ mod layers{
     pub struct FCLayer{
         pub weights: Vec<Vec<f32>>, // Vec[neuron][inputs]
         pub biases: Vec<f32>,
-
     }
     impl Layer for FCLayer{
 
-        fn forward_propagate(&self, prev_layer: &Vec<f32>) -> Vec<f32>{
-
+        /// Forward propagate values
+        fn forward_propagate(&self, prev_layer: &[f32]) -> Vec<f32>{
             // calculate dot products
             // For each neuron, multiply the values of the input neurons times the weights for this neuron
             // calculate sum of weight * each previous connection
@@ -286,7 +369,7 @@ mod tests{
     #[test]
     /// Test Accuracy metric
     fn accuracy(){
-        let m  = Accuracy{};
+        let m  = Accuracy{values: vec![]};
         assert_eq!(0.5f32, m.calculate_metric(5, 5, 5, 5));
         assert_eq!(0.25f32, m.calculate_metric(5, 0, 10, 5));
         assert_eq!(1f32, m.calculate_metric(10, 10, 0, 0));
@@ -295,7 +378,7 @@ mod tests{
     #[test]
     /// Test Recall metric
     fn recall(){
-        let m = Recall{};
+        let m = Recall{values: vec![]};
         assert_eq!(0.5f32, m.calculate_metric(5, 0, 0, 5));
         assert_eq!(1f32, m.calculate_metric(10, 0, 0, 0));
         assert_eq!(0f32, m.calculate_metric(0, 0, 0, 10));
@@ -305,7 +388,7 @@ mod tests{
     #[test]
     /// Test Precision metric
     fn precision(){
-        let m = Precision{};
+        let m = Precision{values: vec![]};
         assert_eq!(0.5f32, m.calculate_metric(5, 0, 5, 0));
         assert_eq!(1f32, m.calculate_metric(5, 0, 0, 0));
         assert_eq!(0f32, m.calculate_metric(0, 0, 5, 0));
@@ -314,17 +397,19 @@ mod tests{
     #[test]
     /// Test MSE
     fn mse(){
+        let a = MSE{};
         let pred = vec![0.0, 1.0, 2.0, 3.0];
         let resp = vec![2.0, 3.0, 4.0, 5.0];
-        assert_eq!(4f32, MSE::calculate_loss(&pred, &resp));
+        assert_eq!(4f32, a.calculate_loss(&pred, &resp));
     }
 
     #[test]
     /// Test MAE
     fn mae(){
+        let a = MAE{};
         let pred = vec![0.0, 1.0, 2.0, 3.0];
         let resp = vec![2.0, 3.0, 4.0, 5.0];
-        assert_eq!(2f32, MAE::calculate_loss(&pred, &resp));
+        assert_eq!(2f32, a.calculate_loss(&pred, &resp));
     }
 
     #[test]
