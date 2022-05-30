@@ -2,54 +2,30 @@
 /*
 
 TODO:
-- create linear algebra logic..?
-- create different activations functions
+
 - create different optimizer functions
 - create FC layer
 - create Conv2d layer
 - Use slices instead of Vec in forward, back, activation, and loss fns
-- Implement Softmax activation
+- Implement Cross Entropy
 - Create Dropout layer
 - Implement regularization
 - use Vec<Vec<f32>> in loss fn instead of Vec<f32> to be able to easily implement cross entropy or other loss fn
-- Maybe don't collect in propagation, just return an iterator that can be collected.
 
  */
 
+mod metrics;
+mod activations;
+
 pub mod neural_net{
-    use crate::metrics::{Precision, Metric, Recall, Accuracy};
-    use crate::activation_fns::Activate;
+    // use crate::metrics::{Precision, Metric, Recall, Accuracy};
+    use crate::activations::activation_fns::Activate;
+    use crate::metrics::metrics::Metric;
 
     pub struct Network{
         history: History,
-        metrics: Vec<Box<Metric>>,
     }
 
-    impl Network{
-        fn train(){
-
-        }
-
-        fn predict(){
-
-        }
-
-        fn score(){
-
-        }
-
-        fn add_layer(){
-
-        }
-
-        fn compile(){
-
-        }
-        /// calculate metrics
-        fn calculate_metrics(){
-
-        }
-    }
 
     pub struct History{
         pub loss: Vec<f32>,
@@ -58,20 +34,10 @@ pub mod neural_net{
         pub false_pos: Vec<u64>,
         pub false_neg: Vec<u64>,
         pub epochs: u64,
+        pub metrics: Vec<Box<Metric>>,
     }
 
     impl History{
-
-        // /// Apply a metric to the saved TP, TN, FP, FN values
-        // pub fn apply_metric(&self, m: &mut impl Metric) -> Vec<f32>{
-        //     (0..self.epochs as usize).map(|i: usize|
-        //         m.calculate_and_save_metric(
-        //             self.true_pos[i],
-        //             self.true_neg[i],
-        //             self.false_pos[i],
-        //             self.false_neg[i]))
-        //         .collect()
-        // }
 
         /// Save an epoch's values
         pub fn save_epoch(&mut self, true_pos: u64, true_neg: u64, false_pos: u64, false_neg: u64, loss: f32){
@@ -81,126 +47,12 @@ pub mod neural_net{
             self.false_pos.push(false_pos);
             self.false_neg.push(false_neg);
             self.loss.push(loss);
+
+            for m in &mut self.metrics{
+                m.calculate_and_save_metric(true_pos, true_neg, false_pos, false_neg);
+            }
         }
 
-    }
-
-}
-
-pub mod metrics{
-
-    use std::result::Result;
-    
-    pub trait Metric{
-        fn calculate_metric(&self,
-                            true_pos: u64,
-                            true_neg: u64,
-                            false_pos:u64,
-                            false_neg: u64) -> f32;
-        fn calculate_and_save_metric(&mut self,
-                                     true_pos: u64,
-                                     true_neg: u64,
-                                     false_pos:u64,
-                                     false_neg: u64);
-        fn get_value(&self, index: usize) -> f32;
-        fn get_values(&self) -> &Vec<f32>;
-
-    }
-    
-    pub struct Precision{
-        pub values: Vec<f32>
-    }
-    impl Metric for Precision{
-        /// Precision = TP / (TP + FP)
-        /// Calculate and save value to values Vec<f32>
-        fn calculate_metric(&self,
-                            true_pos: u64,
-                            _true_neg: u64,
-                            false_pos: u64,
-                            _false_neg: u64) -> f32 {
-            (true_pos as f32 / (true_pos + false_pos) as f32) as f32
-        }
-
-        fn calculate_and_save_metric(&mut self,
-                                     true_pos: u64,
-                                     _true_neg: u64,
-                                     false_pos:u64,
-                                     _false_neg: u64) {
-            self.values.push(
-                self.calculate_metric(true_pos, _true_neg, false_pos, _false_neg));
-        }
-
-        fn get_value(&self, index: usize) -> f32 {
-            *self.values.get(index).expect("Unable to access index")
-        }
-
-        fn get_values(&self) -> &Vec<f32>{
-            &self.values
-        }
-    }
-    
-    pub struct Recall{
-        pub values: Vec<f32>
-    }
-    impl Metric for Recall{
-        /// Recall = TP / (TP + FN)
-        /// Calculate and save value to values Vec<f32>
-        fn calculate_metric(&self,
-                            true_pos: u64,
-                            _true_neg: u64,
-                            _false_pos: u64,
-                            false_neg: u64) -> f32 {
-            (true_pos as f32 / (true_pos + false_neg) as f32) as f32
-        }
-
-        fn calculate_and_save_metric(&mut self,
-                                     true_pos: u64,
-                                     _true_neg: u64,
-                                     false_pos:u64,
-                                     _false_neg: u64) {
-            self.values.push(
-                self.calculate_metric(true_pos, _true_neg, false_pos, _false_neg));
-        }
-
-        fn get_value(&self, index: usize) -> f32 {
-            *self.values.get(index).expect("Unable to access index")
-        }
-
-        fn get_values(&self) -> &Vec<f32>{
-            &self.values
-        }
-    }
-    
-    pub struct Accuracy{
-        pub values: Vec<f32>
-    }
-    impl Metric for Accuracy{
-        /// Accuracy = (TP + TN) / (TP + TN + FP + FN)
-        /// Calculate and save value to values Vec<f32>
-        fn calculate_metric(&self,
-                            true_pos: u64,
-                            true_neg: u64,
-                            false_pos: u64,
-                            false_neg: u64) -> f32 {
-            ((true_neg + true_pos) as f32 / (true_neg + true_pos + false_neg + false_pos) as f32) as f32
-        }
-
-        fn calculate_and_save_metric(&mut self,
-                                     true_pos: u64,
-                                     _true_neg: u64,
-                                     false_pos:u64,
-                                     _false_neg: u64) {
-            self.values.push(
-                self.calculate_metric(true_pos, _true_neg, false_pos, _false_neg));
-        }
-
-        fn get_value(&self, index: usize) -> f32 {
-            *self.values.get(index).expect("Unable to access index")
-        }
-
-        fn get_values(&self) -> &Vec<f32>{
-            &self.values
-        }
     }
 
 }
@@ -239,51 +91,9 @@ pub mod loss_fns{
 
 }
 
-mod lin_alg{
-
-
-}
-
-pub mod activation_fns{
-
-    pub trait Activate{
-        fn activate(&self, x: f32) -> f32;
-    }
-
-    pub struct Relu {}
-    impl Activate for Relu {
-        /// max(0, x)
-        fn activate(&self, x: f32) -> f32 {
-            f32::max(0f32,x)
-        }
-    }
-
-    pub struct Sigmoid{}
-    impl Activate for Sigmoid{
-        /// 1 / (1 + e^-x)
-        fn activate(&self, x: f32) -> f32 {
-            1f32 / (1f32 + ((-1f32 * x).exp()))
-        }
-    }
-
-    pub struct Tanh{}
-    impl Activate for Tanh{
-        /// tanh(x)
-        fn activate(&self, x: f32) -> f32 {
-            f32::tanh(x)
-        }
-    }
-
-}
-
-mod optimizers{
-
-}
 
 mod layers{
-    use crate::activation_fns::{Activate};
-    use std::ops::Deref;
-    use std::borrow::Borrow;
+    use crate::activations::activation_fns::Activate;
 
     pub trait Layer{
         fn forward_propagate(&self, prev_layer: &[f32]) -> Vec<f32>;
@@ -339,60 +149,10 @@ mod layers{
 
 #[cfg(test)]
 mod tests{
-    use crate::activation_fns::{Relu, Sigmoid, Activate};
-    use crate::metrics::{Accuracy, Precision, Recall, Metric};
     use crate::loss_fns::{MSE, MAE, Loss};
     use crate::layers::{ActivationLayer, Layer, FCLayer};
+    use crate::activations::activation_fns::Relu;
 
-    #[test]
-    /// Rest Sigmoid activation function
-    fn sigmoid(){
-        let s = Sigmoid{};
-
-        assert_eq!(0.006692851, s.activate(-5f32));
-        assert_eq!(0.047425874, s.activate(-3f32));
-        assert_eq!(0.5, s.activate(0f32));
-        assert_eq!(0.95257413, s.activate(3f32));
-        assert_eq!(0.9933072, s.activate(5f32));
-
-    }
-
-    #[test]
-    /// Test ReLU activation function
-    fn relu(){
-        let r = Relu{};
-        assert_eq!(0f32, r.activate(-1f32));
-        assert_eq!(1f32, r.activate(1f32));
-        assert_eq!(0f32, r.activate(0f32));
-    }
-
-    #[test]
-    /// Test Accuracy metric
-    fn accuracy(){
-        let m  = Accuracy{values: vec![]};
-        assert_eq!(0.5f32, m.calculate_metric(5, 5, 5, 5));
-        assert_eq!(0.25f32, m.calculate_metric(5, 0, 10, 5));
-        assert_eq!(1f32, m.calculate_metric(10, 10, 0, 0));
-    }
-
-    #[test]
-    /// Test Recall metric
-    fn recall(){
-        let m = Recall{values: vec![]};
-        assert_eq!(0.5f32, m.calculate_metric(5, 0, 0, 5));
-        assert_eq!(1f32, m.calculate_metric(10, 0, 0, 0));
-        assert_eq!(0f32, m.calculate_metric(0, 0, 0, 10));
-
-    }
-
-    #[test]
-    /// Test Precision metric
-    fn precision(){
-        let m = Precision{values: vec![]};
-        assert_eq!(0.5f32, m.calculate_metric(5, 0, 5, 0));
-        assert_eq!(1f32, m.calculate_metric(5, 0, 0, 0));
-        assert_eq!(0f32, m.calculate_metric(0, 0, 5, 0));
-    }
 
     #[test]
     /// Test MSE
