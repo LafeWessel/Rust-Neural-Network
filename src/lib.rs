@@ -5,12 +5,20 @@ TODO:
 - create linear algebra logic
 - create different activations functions
 - create different optimizer functions
-- create FC layers
-- create Conv layers
+- create FC layer
+- create Conv2d layer
+- Use slices instead of Vec in forward, back, activation, and loss fns
+- Implement Softmax activation
+- Create Dropout layer
+- Implement regularization
+- use Vec<Vec<f32>> in loss fn instead of Vec<f32> to be able to easily implement cross entropy or other loss fn
+- Maybe don't collect in propagation, just return an iterator that can be collected.
 
  */
 
 pub mod neural_net{
+    use crate::metrics::{Precision, Metric, Recall, Accuracy};
+    use crate::activation_fns::Activate;
 
     pub struct Network{
         history: History
@@ -39,26 +47,57 @@ pub mod neural_net{
     }
 
     pub struct History{
-        loss: Vec<f32>,
-        true_pos: Vec<u64>,
-        true_neg: Vec<u64>,
-        false_pos: Vec<u64>,
-        false_neg: Vec<u64>,
+        pub loss: Vec<f32>,
+        pub true_pos: Vec<u64>,
+        pub true_neg: Vec<u64>,
+        pub false_pos: Vec<u64>,
+        pub false_neg: Vec<u64>,
+        pub epochs: u64,
     }
 
+    impl History{
+        /// Calculate and return Vec<f32> of all precision values
+        pub fn precision(&self) -> Vec<f32>{
+            let m = Precision{};
+            self.apply_metric(&m)
+        }
+
+        /// Calculate and return Vec<f32> of all accuracy values
+        pub fn accuracy(&self) -> Vec<f32>{
+            let m = Accuracy{};
+            self.apply_metric(&m)
+        }
+
+        /// Calculate and return Vec<f32> of all recall values
+        pub fn recall(&self) -> Vec<f32>{
+            let m = Recall{};
+            self.apply_metric(&m)
+        }
+
+        /// Apply a metric to the saved TP, TN, FP, FN values
+        pub fn apply_metric(&self, m: &impl Metric) -> Vec<f32>{
+            (0..self.epochs as usize).map(|i: usize|
+                m.calculate_metric(
+                    self.true_pos[i],
+                    self.true_neg[i],
+                    self.false_pos[i],
+                    self.false_neg[i]))
+                .collect()
+        }
+    }
 
 }
 
 pub mod metrics{
     
     pub trait Metric{
-        fn calculate_metric(true_pos: u64, true_neg: u64, false_pos:u64, false_neg: u64) -> f32;
+        fn calculate_metric(&self, true_pos: u64, true_neg: u64, false_pos:u64, false_neg: u64) -> f32;
     }
     
     pub struct Precision{}
     impl Metric for Precision{
         /// Precision = TP / (TP + FP)
-        fn calculate_metric(true_pos: u64, _true_neg: u64, false_pos: u64, _false_neg: u64) -> f32 {
+        fn calculate_metric(&self, true_pos: u64, _true_neg: u64, false_pos: u64, _false_neg: u64) -> f32 {
             (true_pos as f32 / (true_pos + false_pos) as f32) as f32
         }
     }
@@ -66,7 +105,7 @@ pub mod metrics{
     pub struct Recall{}
     impl Metric for Recall{
         /// Recall = TP / (TP + FN)
-        fn calculate_metric(true_pos: u64, _true_neg: u64, _false_pos: u64, false_neg: u64) -> f32 {
+        fn calculate_metric(&self, true_pos: u64, _true_neg: u64, _false_pos: u64, false_neg: u64) -> f32 {
             (true_pos as f32 / (true_pos + false_neg) as f32) as f32
         }
     }
@@ -74,7 +113,7 @@ pub mod metrics{
     pub struct Accuracy{}
     impl Metric for Accuracy{
         /// Accuracy = (TP + TN) / (TP + TN + FP + FN)
-        fn calculate_metric(true_pos: u64, true_neg: u64, false_pos: u64, false_neg: u64) -> f32 {
+        fn calculate_metric(&self, true_pos: u64, true_neg: u64, false_pos: u64, false_neg: u64) -> f32 {
             ((true_neg + true_pos) as f32 / (true_neg + true_pos + false_neg + false_pos) as f32) as f32
         }
     }
@@ -247,27 +286,29 @@ mod tests{
     #[test]
     /// Test Accuracy metric
     fn accuracy(){
-
-        assert_eq!(0.5f32, Accuracy::calculate_metric(5, 5, 5, 5));
-        assert_eq!(0.25f32, Accuracy::calculate_metric(5, 0, 10, 5));
-        assert_eq!(1f32, Accuracy::calculate_metric(10, 10, 0, 0));
+        let m  = Accuracy{};
+        assert_eq!(0.5f32, m.calculate_metric(5, 5, 5, 5));
+        assert_eq!(0.25f32, m.calculate_metric(5, 0, 10, 5));
+        assert_eq!(1f32, m.calculate_metric(10, 10, 0, 0));
     }
 
     #[test]
     /// Test Recall metric
     fn recall(){
-        assert_eq!(0.5f32, Recall::calculate_metric(5, 0, 0, 5));
-        assert_eq!(1f32, Recall::calculate_metric(10, 0, 0, 0));
-        assert_eq!(0f32, Recall::calculate_metric(0, 0, 0, 10));
+        let m = Recall{};
+        assert_eq!(0.5f32, m.calculate_metric(5, 0, 0, 5));
+        assert_eq!(1f32, m.calculate_metric(10, 0, 0, 0));
+        assert_eq!(0f32, m.calculate_metric(0, 0, 0, 10));
 
     }
 
     #[test]
     /// Test Precision metric
     fn precision(){
-        assert_eq!(0.5f32, Precision::calculate_metric(5, 0, 5, 0));
-        assert_eq!(1f32, Precision::calculate_metric(5, 0, 0, 0));
-        assert_eq!(0f32, Precision::calculate_metric(0, 0, 5, 0));
+        let m = Precision{};
+        assert_eq!(0.5f32, m.calculate_metric(5, 0, 5, 0));
+        assert_eq!(1f32, m.calculate_metric(5, 0, 0, 0));
+        assert_eq!(0f32, m.calculate_metric(0, 0, 5, 0));
     }
 
     #[test]
