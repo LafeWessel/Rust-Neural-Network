@@ -34,7 +34,7 @@ pub mod neural_net{
         pub false_pos: Vec<u64>,
         pub false_neg: Vec<u64>,
         pub epochs: u64,
-        pub metrics: Vec<Box<Metric>>,
+        pub metrics: Vec<Box<dyn Metric>>,
     }
 
     impl History{
@@ -64,7 +64,7 @@ mod layers{
     pub trait Layer{
         fn forward_propagate(&mut self, prev_layer: &[f32]) -> Vec<f32>;
 
-        fn back_propagate(&mut self, output_error: &Vec<Vec<f32>>, learning_rate: f32) -> Vec<Vec<f32>>;
+        fn back_propagate(&mut self, output_error: &Vec<f32>, learning_rate: f32) -> Vec<f32>;
     }
 
     pub struct ActivationLayer<'a, T> where T: Activate {
@@ -81,11 +81,11 @@ mod layers{
         }
 
         /// Apply activation function derivative to input * output error
-        fn back_propagate(&mut self, output_error: &Vec<Vec<f32>>, learning_rate: f32) -> Vec<Vec<f32>>{
+        fn back_propagate(&mut self, output_error: &Vec<f32>, learning_rate: f32) -> Vec<f32>{
             self.input_data.iter()
                 .map(|i| self.func.derivative(*i))
                 .zip(output_error.iter())
-                .map(|(v,e)| v * e)
+                .map(|(v,e)| e * v)
                 .collect()
         }
     }
@@ -112,35 +112,45 @@ mod layers{
                 .zip(self.biases.iter())
                 .map(|(w, b)| w + b)
                 .collect()
-        }
+            }
+            
+            /// calculate backpropagation
+            fn back_propagate(&mut self, output_error: &Vec<f32>, learning_rate: f32) -> Vec<f32>{
+                // calculate and return input error product of output error and weights
+                // for each neuron, multiply each weight by its corresponding output error
+                // should have same length as number of inputs
+                let input_errors : Vec<f32> = (0..self.input_data.len())
+                    .into_iter()
+                    .map(|i| 
+                        self.weights.iter()
+                            .zip(output_error.iter())
+                            .map(|(w,o)| w[i] * o)
+                            .sum::<f32>())
+                        .collect();
 
-        /// calculate
-        fn back_propagate(&mut self, output_error: &Vec<Vec<f32>>, learning_rate: f32) -> Vec<Vec<f32>>{
-            // calculate weight error with dot product of input * output error
-            // for each input, multiply by each of the outputs
-            let weight_errors: Vec<Vec<f32>> = self.input_data.iter()
-                .map(|i| output_error.iter()
-                    .map(|e| e * i)
-                    .collect())
-                .collect();
+                // calculate weight error with dot product of input * output error
+                // for each input, multiply by each of the outputs
+                // should be same size as weights
+                let weight_errors: Vec<Vec<f32>> = output_error.iter()
+                    .map(|i| self.input_data.iter()
+                        .map(|e| e * i).collect()).collect();
 
-            // adjust weights with -= lr * weight error
-            self.weights = self.weights.iter()
-                .zip(weight_errors.iter())
-                .map(|(n,we)| n.iter()
-                    .zip(we.iter())
-                    .map(|(nw, nwe)| nw - (learning_rate * nwe))
-                    .collect())
-                .collect();
+                // adjust weights with -= lr * weight error
+                self.weights = self.weights.iter()
+                    .zip(weight_errors.iter())
+                    .map(|(n,we)| n.iter()
+                        .zip(we.iter())
+                        .map(|(nw, nwe)| nw - (learning_rate * nwe))
+                        .collect())
+                    .collect();
 
-            // adjust biases with -= lr * output error
-            self.biases = self.biases.iter()
-                .zip(output_error.iter())
-                .map(|(b,e)| b - (learning_rate * e))
-                .collect();
+                // adjust biases with -= lr * output error
+                self.biases = self.biases.iter()
+                    .zip(output_error.iter())
+                    .map(|(b,e)| b - (learning_rate * e))
+                    .collect();
 
-            // calculate and return input error = dot product of output error and weights
-            vec![]
+            input_errors
         }
     }
 
@@ -187,6 +197,64 @@ mod tests{
         // neuron 1 output = (0.5 * 0) + (0.75 * 1) + (1 * 2) + 0.5 = 3.25
         // neuron 2 output = (0 * 0) + (0.25 * 1) + (0.5 * 2) + 0.25 = 1.5
         assert_eq!(vec![3.25, 1.5], res);
+
+    }
+
+    #[test]
+    fn activation_layer_backprop(){
+        // Arrange
+        let output_error = vec![0.0, 1.0, 2.0];
+        // learning rate, not actually used for activation function backprop
+        let lr : f32 = 1.0;
+
+        let func = Relu{};
+        let mut l = ActivationLayer{
+            func: &func,
+            input_data: vec![1.0, 1.0, 1.0],
+        };
+
+        // Act
+        let res = l.back_propagate(&output_error, lr);
+
+        // Assert
+        // should be Relu derivative of input data * output error
+        assert_eq!(vec![0.0, 1.0, 2.0], res);
+
+    }
+
+    #[test]
+    fn fc_layer_backprop(){
+        // Arrange
+        // learning rate
+        let lr: f32 = 1.0;
+        // output error
+        let output_error = vec![0.1, 0.5, 1.0];
+        // layer, simulating 2 inputs to 3 neurons
+        let mut l = FCLayer{
+            weights: vec![vec![0.0, 1.0], vec![2.0, 3.0], vec![4.0, 5.0]],
+            biases: vec![1.0, 1.0, 1.0],
+            input_data: vec![0.5, 1.0]
+        };
+
+        // Act
+        let res = l.back_propagate(&output_error, lr);
+
+        // Assert
+        // weight errors should be [[0.05, 0.1], [0.25, 0.5], [0.5, 1.0]]
+        // since learning rate is 1.0, the resulting weights should be [[-0.05, 0.9], [1.75, 2.5], [3.5, 4.0]]
+        assert_eq!(vec![vec![-0.05, 0.9], vec![1.75, 2.5], vec![3.5, 4.0]], l.weights);
+
+        // bias errors are the output errors
+        // since the learning rate is 1.0, the resulting biases should be [0.9, 0.5, 0.0]
+        assert_eq!(vec![0.9, 0.5, 0.0], l.biases);
+
+        // results should be output_error * weights and the same length as the inputs
+        // sum of first of each "neuron" weight * corresponding output error
+        // thus, should be [(0 * 0.1 + 2 * 0.5 + 4 * 1.0), (1 * 0.1 + 3 * 0.5 + 5 * 1)]
+        // = [(0 + 1 + 4), (0.1 + 1.5 + 5)]
+        // = [5, 6.6]
+        assert_eq!(vec![5.0, 6.6], res);
+
 
     }
 
