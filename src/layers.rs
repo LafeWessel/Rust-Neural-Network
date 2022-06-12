@@ -1,10 +1,13 @@
-mod layers{
+pub mod layers{
+    use std::vec;
+
     use crate::activations::activation_fns::Activate;
 
     pub trait Layer{
         fn forward_propagate(&mut self, prev_layer: &[f32]) -> Vec<f32>;
 
-        fn back_propagate(&mut self, output_error: &Vec<f32>, learning_rate: f32) -> Vec<f32>;
+        fn back_propagate(&mut self, output_error: &[f32], learning_rate: f32) -> Vec<f32>;
+
     }
 
     pub struct ActivationLayer<'a, T> where T: Activate {
@@ -21,12 +24,21 @@ mod layers{
         }
 
         /// Apply activation function derivative to input * output error
-        fn back_propagate(&mut self, output_error: &Vec<f32>, learning_rate: f32) -> Vec<f32>{
+        fn back_propagate(&mut self, output_error: &[f32], learning_rate: f32) -> Vec<f32>{
             self.input_data.iter()
                 .map(|i| self.func.derivative(*i))
                 .zip(output_error.iter())
                 .map(|(v,e)| e * v)
                 .collect()
+        }
+        
+    }
+
+    impl<'a, T> ActivationLayer<'a,T> where T: Activate{
+        pub fn new(func: &'a T) -> Self
+        where T: Activate
+        {
+            ActivationLayer { func: func, input_data: vec![] }
         }
     }
 
@@ -55,7 +67,7 @@ mod layers{
             }
             
             /// calculate backpropagation
-            fn back_propagate(&mut self, output_error: &Vec<f32>, learning_rate: f32) -> Vec<f32>{
+            fn back_propagate(&mut self, output_error: &[f32], learning_rate: f32) -> Vec<f32>{
                 // calculate and return input error product of output error and weights
                 // for each neuron, multiply each weight by its corresponding output error
                 // should have same length as number of inputs
@@ -94,11 +106,36 @@ mod layers{
         }
     }
 
+    impl FCLayer{
+        /// Create a new FCLayer, neurons is the same as output size, optionally initialize bias for all neurons
+        pub fn new(input_size: usize, neurons: usize) -> Self{
+
+            // create random weights
+            let mut w = vec![];
+            for i in 0..neurons{
+                w.push(vec![]);
+                for k in 0..input_size{
+                    // TODO convert to random
+                    w[i].push(0.0);
+                }
+            }
+
+            // init biases
+            let mut b = vec![];
+            for i in 0..neurons{
+                // TODO convert to random
+                b.push(0.0);
+            }
+
+            FCLayer { weights: w, biases: b, input_data: vec![] }
+        }
+    }
+
 }
 
 #[cfg(test)]
 mod tests{
-    use crate::layers::{ActivationLayer, Layer, FCLayer};
+    use crate::layers::layers::{ActivationLayer, Layer, FCLayer};
     use crate::activations::activation_fns::Relu;
 
 
