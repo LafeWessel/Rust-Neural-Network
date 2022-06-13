@@ -31,6 +31,11 @@ pub mod neural_net{
     }
 
     impl Network{
+        pub fn new(loss_fn: Box<dyn Loss>, lr: f32) -> Self{
+            Network { history: History::new(), layers: vec![], loss_fn: loss_fn, learning_rate: lr }
+        }
+
+
         pub fn add_layer(&mut self, layer: Box<dyn Layer>){
             self.layers.push(layer);
         }
@@ -47,14 +52,14 @@ pub mod neural_net{
         
                     // calculate metrics and loss
                     let loss = self.loss_fn.loss(&preds, &yi);
-                    self.history.save_epoch(loss);
                     tot_loss += loss;
-        
+                    
                     
                     // backward propagate
                     let loss_deriv = self.loss_fn.loss_derivative(&preds, &yi);
                     self.backwards_propagate(&preds, &yi);
                 }
+                self.history.save_epoch(tot_loss/X.len() as f32);
                 println!("Epoch {}/{}: avg loss={}",i, epochs, tot_loss/X.len() as f32);
             }
 
@@ -97,6 +102,10 @@ pub mod neural_net{
 
     impl History{
 
+        pub fn new() -> Self{
+            History { loss: vec![], epochs: 0 }
+        }
+
         /// Save an epoch's values
         pub fn save_epoch(&mut self, loss: f32){
             self.epochs += 1;
@@ -109,6 +118,8 @@ pub mod neural_net{
 
 #[cfg(test)]
 mod tests{
+    use crate::{neural_net::Network, loss::loss_fns::MSE, layers::layers::{FCLayer, ActivationLayer}, activations::activation_fns::Relu};
+
     #[test]
     /// test network forward propagation
     fn network_forward(){
@@ -130,6 +141,49 @@ mod tests{
     #[test]
     /// test network fit
     fn network_fit(){
+
+    }
+
+    #[test]
+    /// test XOR network example
+    fn test_network_xor(){
+
+        // Arrange
+        // create base network
+        let loss = MSE{};
+        let mut network = Network::new(Box::new(loss), 0.005);
+        
+        // create layers
+        // first layer
+        let mut fc1 = FCLayer::new(2, 2);
+        let relu1 = Relu{};
+        let mut ac1 = ActivationLayer::new(relu1);
+        network.add_layer(Box::new(fc1));
+        network.add_layer(Box::new(ac1));
+
+        // second layer
+        let mut fc2 = FCLayer::new(2, 2);
+        let relu2 = Relu{};
+        let mut ac2 = ActivationLayer::new(relu2);
+        network.add_layer(Box::new(fc2));
+        network.add_layer(Box::new(ac2));
+
+        // output layer
+        let mut out = FCLayer::new(2, 1);
+        network.add_layer(Box::new(out));
+
+
+        // create X,y
+        let X = vec![vec![1.0, 1.0], vec![1.0, 0.0], vec![0.0, 0.0], vec![0.0, 1.0]];
+        let y = vec![vec![0.0], vec![1.0], vec![1.0], vec![0.0]];
+
+        // Act
+        network.fit(&X, &y, 100);
+
+        // Assert
+        // assert that loss decreased as network progressed
+        assert!(network.get_history().loss[0] > network.get_history().loss[100-1]);
+        
 
     }
 }
