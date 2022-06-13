@@ -17,40 +17,88 @@ TODO:
 mod metrics;
 mod activations;
 mod loss;
+mod layers;
 
 pub mod neural_net{
     use crate::activations::activation_fns::Activate;
     use crate::metrics::metrics::Metric;
+    use crate::layers::layers::Layer;
+    use crate::loss::loss_fns::Loss;
 
     pub struct Network{
         history: History,
+        layers: Vec<Box<dyn Layer>>,
+        loss_fn: Box<dyn Loss>,
+        learning_rate: f32,
+    }
+
+    impl Network{
+        pub fn add_layer(&mut self, layer: Box<dyn Layer>){
+            self.layers.push(layer);
+        }
+
+        /// Fit the model to X and y for a specified number of epochs
+        pub fn fit(&mut self, X: &Vec<Vec<f32>>, y: &Vec<Vec<f32>>, epochs: u32){
+
+            // for each sample for each epoch
+            for i in 1..=epochs{
+                for (xi, yi) in X.iter().zip(y.iter()){
+                    // forward propagate
+                    let preds = self.forward_propagate(&xi);
+        
+                    // calculate metrics and loss
+                    let loss = 
+        
+                    
+                    // backward propagate
+
+
+                }
+            }
+
+        }
+        
+        /// Make predictions based on input X
+        pub fn predict(&mut self, X: &Vec<Vec<f32>>) -> Vec<f32>{
+            X.iter().map(|x| self.forward_propagate(&x)).collect()
+        }
+
+        /// Get fit()/train history
+        pub fn get_history(&self) -> &History{
+            &self.history
+        }
+
+        /// Forward propagate through network
+        fn forward_propagate(&mut self, X: &Vec<f32>) -> Vec<f32>{
+            let mut t = X.clone();
+            for layer in &mut self.layers.iter_mut(){
+                t = layer.forward_propagate(&t);
+            }
+            t
+        }
+
+        /// Backward propagate through network
+        fn backwards_propagate(&mut self, predictions: &[f32], targets: &[f32]){
+            let mut loss = self.loss_fn.loss_derivative(predictions, targets);
+            for layer in &mut self.layers.iter_mut().rev(){
+                loss = layer.back_propagate(&loss, self.learning_rate)
+            }
+        }
+
     }
 
 
     pub struct History{
         pub loss: Vec<f32>,
-        pub true_pos: Vec<u64>,
-        pub true_neg: Vec<u64>,
-        pub false_pos: Vec<u64>,
-        pub false_neg: Vec<u64>,
         pub epochs: u64,
-        pub metrics: Vec<Box<dyn Metric>>,
     }
 
     impl History{
 
         /// Save an epoch's values
-        pub fn save_epoch(&mut self, true_pos: u64, true_neg: u64, false_pos: u64, false_neg: u64, loss: f32){
+        pub fn save_epoch(&mut self, loss: f32){
             self.epochs += 1;
-            self.true_pos.push(true_pos);
-            self.true_neg.push(true_neg);
-            self.false_pos.push(false_pos);
-            self.false_neg.push(false_neg);
             self.loss.push(loss);
-
-            for m in &mut self.metrics{
-                m.calculate_and_save_metric(true_pos, true_neg, false_pos, false_neg);
-            }
         }
 
     }
