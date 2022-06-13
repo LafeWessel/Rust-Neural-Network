@@ -46,33 +46,6 @@ pub mod activation_fns{
         }
     }
 
-    pub struct Softmax{
-        pub dividend: Option<f32>,
-    }
-    impl Activate for Softmax{
-
-        fn activate(&self, x: f32) -> f32 {
-            x.exp() / self.dividend.unwrap()
-        }
-
-        fn derivative(&self, x: f32) -> f32 {
-            todo!()
-        }
-
-    }
-    impl Softmax{
-        /// Initialize dividend for calculating outputs
-        pub fn init_div(&mut self, input: &[f32]){
-            self.dividend = Some(input.iter().map(|i| i.exp()).sum::<f32>())
-        }
-
-        /// Clear dividend after calculating inputs
-        pub fn clear_div(&mut self){
-            self.dividend = None;
-        }
-
-    }
-
 }
 
 #[cfg(test)]
