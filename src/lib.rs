@@ -14,14 +14,12 @@ TODO:
 
  */
 
-mod metrics;
 mod activations;
 mod loss;
 mod layers;
 
 pub mod neural_net{
     use crate::activations::activation_fns::Activate;
-    use crate::metrics::metrics::Metric;
     use crate::layers::layers::Layer;
     use crate::loss::loss_fns::Loss;
 
@@ -42,24 +40,28 @@ pub mod neural_net{
 
             // for each sample for each epoch
             for i in 1..=epochs{
+                let mut tot_loss = 0.0;
                 for (xi, yi) in X.iter().zip(y.iter()){
                     // forward propagate
                     let preds = self.forward_propagate(&xi);
         
                     // calculate metrics and loss
-                    let loss = 
+                    let loss = self.loss_fn.loss(&preds, &yi);
+                    self.history.save_epoch(loss);
+                    tot_loss += loss;
         
                     
                     // backward propagate
-
-
+                    let loss_deriv = self.loss_fn.loss_derivative(&preds, &yi);
+                    self.backwards_propagate(&preds, &yi);
                 }
+                println!("Epoch {}/{}: avg loss={}",i, epochs, tot_loss/X.len() as f32);
             }
 
         }
         
         /// Make predictions based on input X
-        pub fn predict(&mut self, X: &Vec<Vec<f32>>) -> Vec<f32>{
+        pub fn predict(&mut self, X: &Vec<Vec<f32>>) -> Vec<Vec<f32>>{
             X.iter().map(|x| self.forward_propagate(&x)).collect()
         }
 
@@ -105,5 +107,30 @@ pub mod neural_net{
 
 }
 
+#[cfg(test)]
+mod tests{
+    #[test]
+    /// test network forward propagation
+    fn network_forward(){
 
+    }
+
+    #[test]
+    /// test network backprop
+    fn network_backprop(){
+
+    }
+
+    #[test]
+    /// test network predict
+    fn network_predict(){
+
+    }
+
+    #[test]
+    /// test network fit
+    fn network_fit(){
+
+    }
+}
 
