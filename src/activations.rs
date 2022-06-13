@@ -50,7 +50,7 @@ pub mod activation_fns{
 
 #[cfg(test)]
 mod test{
-    use crate::activations::activation_fns::{Sigmoid, Relu, Softmax, Activate};
+    use crate::activations::activation_fns::{Sigmoid, Relu, Activate};
 
     #[test]
     /// Rest Sigmoid activation function
@@ -72,24 +72,6 @@ mod test{
         assert_eq!(0f32, r.activate(-1f32));
         assert_eq!(1f32, r.activate(1f32));
         assert_eq!(0f32, r.activate(0f32));
-    }
-
-    #[test]
-    /// Test Softmax activation function
-    fn softmax(){
-        let mut s = Softmax{dividend: None};
-        // initialization vec
-        let v: Vec<f32> = vec![1.0, 2.0, 3.0];
-
-        // hand calculated dividend:
-        let d = v[0].exp() + v[1].exp() + v[2].exp();
-
-        // init softmax
-        s.init_div(&v);
-
-        assert_eq!(v[0].exp()/d, s.activate(v[0]));
-        assert_eq!(v[1].exp()/d, s.activate(v[1]));
-        assert_eq!(v[2].exp()/d, s.activate(v[2]));
     }
 
 }
