@@ -26,7 +26,7 @@ pub mod layers{
         }
 
         /// Apply activation function derivative to input * output error
-        fn back_propagate(&mut self, output_error: &[f32], learning_rate: f32) -> Vec<f32>{
+        fn back_propagate(&mut self, output_error: &[f32], _learning_rate: f32) -> Vec<f32>{
             self.input_data.iter()
                 .map(|i| self.func.derivative(*i))
                 .zip(output_error.iter())
@@ -117,14 +117,14 @@ pub mod layers{
             let mut w = vec![];
             for i in 0..neurons{
                 w.push(vec![]);
-                for k in 0..input_size{
+                for _ in 0..input_size{
                     w[i].push(rng.gen_range(-1.0..1.0));
                 }
             }
 
             // init biases
             let mut b = vec![];
-            for i in 0..neurons{
+            for _ in 0..neurons{
                 b.push(rng.gen_range(-1.0..1.0));
             }
 
