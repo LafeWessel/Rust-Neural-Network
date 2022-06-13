@@ -1,6 +1,8 @@
 pub mod layers{
     use std::vec;
 
+    use rand::Rng;
+
     use crate::activations::activation_fns::Activate;
 
     pub trait Layer{
@@ -10,12 +12,12 @@ pub mod layers{
 
     }
 
-    pub struct ActivationLayer<'a, T> where T: Activate {
-        pub func: &'a T,
+    pub struct ActivationLayer<T> where T: Activate + Sized {
+        pub func: T,
         pub input_data: Vec<f32>
     }
 
-    impl<'a, T> Layer for ActivationLayer<'a, T> where T: Activate{
+    impl<T> Layer for ActivationLayer<T> where T: Activate + Sized{
 
         /// Apply activation function to all inputs
         fn forward_propagate(&mut self, prev_layer: &[f32]) -> Vec<f32>{
@@ -34,9 +36,9 @@ pub mod layers{
         
     }
 
-    impl<'a, T> ActivationLayer<'a,T> where T: Activate{
-        pub fn new(func: &'a T) -> Self
-        where T: Activate
+    impl<T> ActivationLayer<T> where T: Activate + Sized{
+        pub fn new(func: T) -> Self
+        where T: Activate + Sized
         {
             ActivationLayer { func: func, input_data: vec![] }
         }
@@ -109,22 +111,21 @@ pub mod layers{
     impl FCLayer{
         /// Create a new FCLayer, neurons is the same as output size, optionally initialize bias for all neurons
         pub fn new(input_size: usize, neurons: usize) -> Self{
+            let mut rng = rand::thread_rng();
 
             // create random weights
             let mut w = vec![];
             for i in 0..neurons{
                 w.push(vec![]);
                 for k in 0..input_size{
-                    // TODO convert to random
-                    w[i].push(0.0);
+                    w[i].push(rng.gen_range(-1.0..1.0));
                 }
             }
 
             // init biases
             let mut b = vec![];
             for i in 0..neurons{
-                // TODO convert to random
-                b.push(0.0);
+                b.push(rng.gen_range(-1.0..1.0));
             }
 
             FCLayer { weights: w, biases: b, input_data: vec![] }
@@ -145,7 +146,7 @@ mod tests{
         // use Relu for simple activation function
         let a = Relu{};
         let mut l = ActivationLayer{
-            func: &a,
+            func: a,
             input_data: vec![]
         };
 
@@ -186,7 +187,7 @@ mod tests{
 
         let func = Relu{};
         let mut l = ActivationLayer{
-            func: &func,
+            func: func,
             input_data: vec![1.0, 1.0, 1.0],
         };
 
