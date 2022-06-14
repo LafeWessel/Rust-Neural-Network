@@ -1,8 +1,6 @@
 pub mod layers{
     use std::vec;
-
     use rand::Rng;
-
     use crate::activations::activation_fns::Activate;
 
     pub trait Layer{
@@ -37,6 +35,7 @@ pub mod layers{
     }
 
     impl<T> ActivationLayer<T> where T: Activate + Sized{
+        /// Create a new Activation Layer
         pub fn new(func: T) -> Self
         where T: Activate + Sized
         {

@@ -16,11 +16,12 @@ pub mod neural_net{
     }
 
     impl Network{
+        /// Create a new network, initialize with loss function and learning rate
         pub fn new(loss_fn: Box<dyn Loss>, lr: f32) -> Self{
             Network { history: History::new(), layers: vec![], loss_fn: loss_fn, learning_rate: lr }
         }
 
-
+        /// Add a layer to the network
         pub fn add_layer(&mut self, layer: Box<dyn Layer>){
             self.layers.push(layer);
         }
